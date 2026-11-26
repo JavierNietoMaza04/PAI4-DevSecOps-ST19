@@ -1,0 +1,60 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-static:
+    name: Etapa 1 - Build y Análisis Estático
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Preparar directorio de informes
+        run: mkdir -p reports
+
+      - name: Build - Construir imagen Docker
+        run: docker build -t juice-shop:test .
+
+      - name: SAST - Semgrep
+        continue-on-error: true
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" semgrep/semgrep \
+            semgrep scan --config p/default --error --json --output /src/reports/semgrep.json
+
+      - name: SCA - OWASP Dependency-Check
+        continue-on-error: true
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'juice-shop'
+          path: '.'
+          format: 'XML'
+          out: 'reports'
+          args: >
+            --failOnCVSS 7
+
+      # --- AQUÍ AÑADIRÁ EL INTEGRANTE 2 EL PASO DE IaC (TRIVY -> reports/trivy-iac.json) ---
+
+      - name: Guardar informes estáticos como artefactos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-reports
+          path: reports/
+
+  # --- AQUÍ AÑADIRÁ EL INTEGRANTE 2 EL JOB dast-staging (ZAP -> zap-report.xml) ---
+
+  # --- AQUÍ AÑADIRÁ EL INTEGRANTE 3 EL JOB defectdojo-upload (if: always()) ---
+
+  deploy-production:
+    name: Etapa 3 - Producción / Despliegue
+    needs: [build-and-static]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Despliegue en Producción (simulado)
+        run: echo "Desplegando versión aprobada en producción..."
