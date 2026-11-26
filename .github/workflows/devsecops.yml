@@ -26,6 +26,11 @@ jobs:
           docker run --rm -v "${{ github.workspace }}:/src" semgrep/semgrep \
             semgrep scan --config p/default --error --json --output /src/reports/semgrep.json
 
+      - name: Instalar dependencias para análisis SCA
+        run: |
+          npm ci --ignore-scripts
+          npm --prefix frontend ci --ignore-scripts
+
       - name: SCA - OWASP Dependency-Check
         continue-on-error: true
         uses: dependency-check/Dependency-Check_Action@main
