@@ -28,8 +28,8 @@ jobs:
 
       - name: Instalar dependencias para análisis SCA
         run: |
-          npm ci --ignore-scripts
-          npm --prefix frontend ci --ignore-scripts
+          npm install --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+          npm --prefix frontend install --ignore-scripts --legacy-peer-deps --no-audit --no-fund
 
       - name: SCA - OWASP Dependency-Check
         continue-on-error: true
