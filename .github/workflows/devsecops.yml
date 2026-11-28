@@ -42,8 +42,6 @@ jobs:
           args: >
             --failOnCVSS 7
 
-      # --- AQUÍ AÑADIRÁ EL INTEGRANTE 2 EL PASO DE IaC (TRIVY -> reports/trivy-iac.json) ---
-
       - name: Análisis IaC con Trivy
         continue-on-error: true
         uses: aquasecurity/trivy-action@master
@@ -62,13 +60,46 @@ jobs:
           name: static-reports
           path: reports/
 
-  # --- AQUÍ AÑADIRÁ EL INTEGRANTE 2 EL JOB dast-staging (ZAP -> zap-report.xml) ---
+  dast-staging:
+    name: Etapa 2 - Staging y Análisis Dinámico
+    needs: [build-and-static]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Desplegar aplicación en Staging (Docker)
+        run: |
+          docker build -t juice-shop-staging .
+          docker run -d --name juice-shop -p 3000:3000 juice-shop-staging
+          echo "Esperando a que Juice Shop arranque en localhost:3000..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:3000 > /dev/null; then
+              echo "Aplicación lista en http://localhost:3000"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Análisis DAST con OWASP ZAP Baseline (Gate B)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'http://localhost:3000'
+          xml_report_name: 'zap-report.xml'
+          allow_issue_writing: false
+
+      - name: Guardar informe DAST como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dast-reports
+          path: zap-report.xml
 
   # --- AQUÍ AÑADIRÁ EL INTEGRANTE 3 EL JOB defectdojo-upload (if: always()) ---
 
   deploy-production:
     name: Etapa 3 - Producción / Despliegue
-    needs: [build-and-static]
+    needs: [build-and-static, dast-staging]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
